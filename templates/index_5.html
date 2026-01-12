@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard Analytics Arduino</title>
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  
+  <style>
+    body { background-color: #f0f2f5; }
+    
+    .card-dashboard {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+      background: white;
+      transition: all 0.3s ease;
+    }
+    
+    /* Toggle Switch Grande */
+    .form-switch .form-check-input {
+      width: 4rem; height: 2rem; cursor: pointer;
+    }
+    .form-switch .form-check-input:checked {
+      background-color: #198754; border-color: #198754;
+    }
+    
+    .icon-box {
+      width: 48px; height: 48px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    }
+
+    /* Estilo da Paginação */
+    .pagination .page-link {
+      border: none;
+      margin: 0 3px;
+      border-radius: 5px;
+      color: #555;
+    }
+    .pagination .page-item.active .page-link {
+      background-color: #0d6efd;
+      color: white;
+      font-weight: bold;
+    }
+    .pagination .page-link:focus { box-shadow: none; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+    <div class="container">
+      <a class="navbar-brand" href="#">
+        <i class="bi bi-cpu-fill text-warning me-2"></i>IoT Monitor
+      </a>
+      <button onclick="location.reload()" class="btn btn-sm btn-outline-secondary text-light">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
+  </nav>
+
+  <div class="container pb-5">
+    
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="card card-dashboard h-100 py-2">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <div class="text-xs fw-bold text-primary text-uppercase mb-1">Total de Registros</div>
+              <div class="h3 mb-0 fw-bold text-gray-800">{{ registros|length }}</div>
+            </div>
+            <div class="icon-box bg-primary bg-opacity-10 text-primary"><i class="bi bi-database"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-dashboard h-100 py-2">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <div class="text-xs fw-bold text-success text-uppercase mb-1">Status do LED</div>
+              <div class="h4 mb-0 fw-bold" id="status-display">{{ status }}</div>
+            </div>
+            <div class="icon-box bg-success bg-opacity-10 text-success"><i class="bi bi-lightbulb"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card card-dashboard h-100 py-2">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <div class="text-xs fw-bold text-info text-uppercase mb-1">Conexão</div>
+              <div class="h4 mb-0 fw-bold">{% if conectado %}Online{% else %}Offline{% endif %}</div>
+            </div>
+            <div class="icon-box bg-info bg-opacity-10 text-info"><i class="bi bi-wifi"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="card card-dashboard mb-4">
+          <div class="card-header bg-white py-3 border-bottom-0">
+            <h6 class="m-0 fw-bold text-dark"><i class="bi bi-sliders me-2"></i>Painel de Controle</h6>
+          </div>
+          <div class="card-body">
+            {% if not conectado %}
+              <div class="d-grid">
+                <button onclick="postar('/conectar')" class="btn btn-primary btn-lg py-3 shadow-sm">
+                  <i class="bi bi-plug-fill me-2"></i>Conectar Arduino
+                </button>
+              </div>
+            {% else %}
+              <div class="d-flex align-items-center justify-content-between p-4 bg-light rounded-4 mb-4 border">
+                <div>
+                  <h5 class="fw-bold mb-0">Alimentação</h5>
+                  <small class="text-muted">Interruptor Principal</small>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input shadow-none" type="checkbox" role="switch" id="ledSwitch" 
+                         onchange="toggleLed(this)"
+                         {% if 'Ligado' in status %}checked{% endif %}>
+                </div>
+              </div>
+              <div class="d-grid gap-2">
+                <button onclick="postar('/atualiza_datahora')" class="btn btn-outline-secondary">
+                  <i class="bi bi-clock me-2"></i>Sincronizar Relógio
+                </button>
+                <button onclick="postar('/desconectar')" class="btn btn-outline-danger btn-sm mt-2">
+                  Desconectar
+                </button>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <div class="card card-dashboard">
+          <div class="card-body">
+             <h6 class="fw-bold text-secondary mb-3 small text-uppercase">Proporção de Uso</h6>
+             <div style="height: 200px;"><canvas id="doughnutChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-8">
+        <div class="card card-dashboard h-100">
+          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 fw-bold text-dark"><i class="bi bi-journal-text me-2"></i>Histórico de Logs</h6>
+            <span class="badge bg-secondary rounded-pill" id="total-badge">0 reg</span>
+          </div>
+          
+          <div class="card-body p-0 d-flex flex-column justify-content-between">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0" id="logsTable">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-4">Evento</th>
+                    <th>Estado</th>
+                    <th class="text-end pe-4">Data/Hora</th>
+                  </tr>
+                </thead>
+                <tbody id="logsBody">
+                  {% for descricao, data_hora, status_reg in registros %}
+                  <tr class="log-row">
+                    <td class="ps-4 fw-medium">{{ descricao }}</td>
+                    <td>
+                      {% if 'Ligado' in status_reg or 'Conectado' in status_reg %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">{{ status_reg }}</span>
+                      {% elif 'Desligado' in status_reg or 'Desconectado' in status_reg %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">{{ status_reg }}</span>
+                      {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">{{ status_reg }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end pe-4 text-muted small font-monospace">{{ data_hora }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light rounded-bottom">
+                <small class="text-muted" id="page-info">Mostrando pág 1</small>
+                <nav aria-label="Navegação de registros">
+                  <ul class="pagination pagination-sm mb-0" id="pagination-controls">
+                    </ul>
+                </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // === CONFIGURAÇÃO DA PAGINAÇÃO ===
+    const ITEMS_PER_PAGE = 10;
+    let currentPage = 1;
+    
+    // Recupera a página salva antes do refresh (se houver)
+    const savedPage = localStorage.getItem('arduinoPage');
+    if (savedPage) currentPage = parseInt(savedPage);
+
+    function initPagination() {
+      const rows = document.querySelectorAll('.log-row');
+      const totalRows = rows.length;
+      const totalPages = Math.ceil(totalRows / ITEMS_PER_PAGE);
+
+      // Atualiza badge de total
+      document.getElementById('total-badge').textContent = totalRows + ' reg';
+
+      // Validação básica se a página salva excede o total (ex: deletou registros)
+      if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      renderTable(rows, totalRows);
+      renderControls(totalPages);
+      updateChart(rows);
+    }
+
+    function renderTable(rows, totalRows) {
+      // Esconde tudo
+      rows.forEach(row => row.style.display = 'none');
+
+      // Se não tem registros
+      if (totalRows === 0) {
+        document.getElementById('logsBody').innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Sem registros</td></tr>';
+        return;
+      }
+
+      // Calcula range
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+
+      // Mostra apenas os da página atual
+      for (let i = start; i < end && i < totalRows; i++) {
+        rows[i].style.display = '';
+      }
+
+      document.getElementById('page-info').textContent = `Página ${currentPage} de ${Math.ceil(totalRows/ITEMS_PER_PAGE)}`;
+    }
+
+    function renderControls(totalPages) {
+      const paginationContainer = document.getElementById('pagination-controls');
+      paginationContainer.innerHTML = '';
+
+      if (totalPages <= 1) return;
+
+      // Botão Anterior
+      const prevLi = document.createElement('li');
+      prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+      prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">&laquo;</a>`;
+      paginationContainer.appendChild(prevLi);
+
+      // Números (Lógica simples: mostra todos se < 7, ou lógica complexa se quiser resumir)
+      // Aqui faremos simples para brevidade: mostra até 5 páginas ao redor da atual
+      let startPage = Math.max(1, currentPage - 2);
+      let endPage = Math.min(totalPages, currentPage + 2);
+
+      for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+        paginationContainer.appendChild(li);
+      }
+
+      // Botão Próximo
+      const nextLi = document.createElement('li');
+      nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+      nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1})">&raquo;</a>`;
+      paginationContainer.appendChild(nextLi);
+    }
+
+    // Função chamada ao clicar nos botões de paginação
+    window.changePage = function(page) {
+      currentPage = page;
+      localStorage.setItem('arduinoPage', currentPage); // Salva estado
+      initPagination();
+    }
+
+    // --- CHART E TOGGLES (Lógica Anterior) ---
+    function toggleLed(element) {
+      element.disabled = true;
+      document.body.style.cursor = 'wait';
+      postar(element.checked ? '/ligar' : '/desligar');
+    }
+
+    function postar(url) {
+      fetch(url, {method: "POST"})
+        .then(r => r.json())
+        .then(d => {
+          // Mantém a página atual salva no localStorage antes de recarregar
+          setTimeout(() => location.reload(), 300);
+        })
+        .catch(err => {
+          alert('Erro de comunicação!');
+          location.reload();
+        });
+    }
+
+    function updateChart(rows) {
+      let on = 0, off = 0;
+      // Conta TODOS os registros (não só os da página visível)
+      rows.forEach(row => {
+        if(row.innerText.includes('Ligado')) on++;
+        if(row.innerText.includes('Desligado')) off++;
+      });
+
+      const ctx = document.getElementById('doughnutChart').getContext('2d');
+      if(window.myChart) window.myChart.destroy();
+      
+      window.myChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Ligado', 'Desligado'],
+          datasets: [{
+            data: [on, off],
+            backgroundColor: ['#198754', '#dc3545'],
+            borderWidth: 0
+          }]
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    // Inicializa tudo
+    document.addEventListener('DOMContentLoaded', initPagination);
+  </script>
+</body>
+</html>

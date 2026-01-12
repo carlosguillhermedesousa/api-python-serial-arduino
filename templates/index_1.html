@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Controle Arduino - LED Inteligente</title>
+</head>
+<body>
+  <h1>Controle Arduino</h1>
+  <p>Status: <span id="status">{{ status }}</span></p>
+
+  {% if not conectado %}
+    <button onclick="postar('/conectar')">Conectar</button>
+  {% else %}
+    <button onclick="postar('/desconectar')">Desconectar</button>
+    <button onclick="postar('/ligar')">Ligar</button>
+    <button onclick="postar('/desligar')">Desligar</button>
+    <button onclick="postar('/atualiza_datahora')">Atualizar Data/Hora</button>
+  {% endif %}
+
+  <h2>Últimos registros</h2>
+  <ul>
+    {% for descricao, data_hora, status in registros %}
+      <li>{{ descricao }} - {{ status }} - {{ data_hora }}</li>
+    {% endfor %}
+  </ul>
+
+<script>
+function postar(url) {
+  fetch(url, {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("status").textContent = d.status;
+      setTimeout(() => location.reload(), 500);
+    });
+}
+</script>
+</body>
+</html>
